@@ -42,11 +42,15 @@ def process_segment(segment, tolerance):
     # Инвертируем маску
     mask_inv = 255 - mask_cleaned
 
-    # Применяем маски
+    # Применяем маску и создаем изображение с прозрачным фоном
     segment_rgb = cv2.cvtColor(segment, cv2.COLOR_HSV2RGB)
-    result = segment_rgb.copy()
-    result[mask_inv == 0] = [0, 0, 0] # Удаляем фона
-    return result, mask_inv
+    result = np.zeros((segment_rgb.shape[0], segment_rgb.shape[1], 4), dtype=np.uint8) # RGBA для прозрачности по альфа каналу
+
+    # Удаляем фон
+    result[..., :3] = segment_rgb # Эквивалент [:, :, :3]
+    result[..., 3] = mask_inv # Прозрачность только для фона
+
+    return result
 
 # Разделяем изображения на 4 части по котам
 h, w = image_hsv.shape[:2]
@@ -65,9 +69,8 @@ masks = []
 tolerances = [35, 85, 60, 100] # Пороги для каждого кота
 
 for i, segment in enumerate(segments):
-    result, mask = process_segment(segment, tolerances[i])
+    result = process_segment(segment, tolerances[i])
     results.append(result)
-    masks.append(mask)
 
 # Объединяем сегменты обратно
 top_row = np.hstack((results[0], results[1]))
@@ -76,6 +79,10 @@ final_image = np.vstack((top_row, bottom_row))
 
 plt.figure(figsize=(10, 10))
 plt.imshow(final_image)
-plt.title("Background Removed (4 Segments)")
+plt.title("Background Removed")
 plt.axis('off')
 plt.show()
+
+# Сохраняем изображение с прозрачным фоном
+final_image_bgra = cv2.cvtColor(final_image, cv2.COLOR_RGBA2BGRA)
+cv2.imwrite('cats_no_background.png', final_image_bgra)
